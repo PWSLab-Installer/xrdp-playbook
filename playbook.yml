@@ -1,0 +1,93 @@
+- hosts: localhost
+  connection: local
+
+  vars:
+    password: xrdp
+
+  tasks:
+      
+    -   name: Check the version of OS
+        command: hostnamectl
+        register: os_check
+        ignore_errors: yes  
+
+    -   name: Install XRDP - Ubuntu 18
+        apt: 
+            name: "{{ item }}" 
+            update_cache: yes 
+            state: present
+        loop: 
+            - xfce4 
+            - xfce4-goodies 
+            - xorg 
+            - dbus-x11 
+            - x11-xserver-utils
+            - xrdp
+        when:
+            - os_check.stdout | regex_search("Ubuntu 18")
+
+    -   name: Absent the Irrelevant files - Ubuntu 20
+        file:
+          path: /etc/apt/sources.list.d/ansible-ubuntu-ansible-focal.list
+          state: absent
+        when:
+          - os_check.stdout | regex_search("Ubuntu 20")
+
+    -   name: Install XRDP - Ubuntu 20
+        apt: 
+            name: "{{ item }}" 
+            update_cache: yes 
+            state: present
+        loop: 
+            - ubuntu-desktop 
+            - xrdp
+        when:
+            - os_check.stdout | regex_search("Ubuntu 20")
+
+    -   name: Add Group ssl-cert
+        group:
+            name: ssl-cert
+            state: present
+
+    -   name: Add the user 'XRDP' 
+        user:
+            name: xrdp
+            state: present
+            group: ssl-cert
+            password: "{{ password | password_hash('sha512') }}"
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Install 'Server with GUI' - CentOS 8
+        shell: dnf groupinstall "Server with GUI" -y
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Install XRDP - CentOS 8
+        dnf: 
+            name: "{{ item }}"
+            state: present
+        loop: 
+            - epel-release
+            - xrdp
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Install XRDP - CentOS 7
+        yum: 
+            name: "{{ item }}"
+            state: present
+        loop: 
+            - epel-release
+            - tigervnc-server
+            - xrdp
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 7")
+
+
+    -   name: Restart XRDP
+        systemd:
+            name: xrdp
+            state: restarted
+            enabled: yes
+    
